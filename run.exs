@@ -5,6 +5,18 @@ Mix.install([
 host = "http://localhost:4000"
 
 # ----------------------------------------------------------------------------
+# Prove the logic function for Spacebucks to pass in as argument
+
+nockma = File.read!(".compiled/Logic.nockma")
+
+# run the nock code in the client by submitting it
+payload = %{program: Base.encode64(nockma)}
+
+%{body: %{"io" => hints, "result" => compiled_logic}} = Req.post!("#{host}/nock/prove", json: payload)
+
+
+IO.inspect hints, label: "hints prove logic.nockma"
+# ----------------------------------------------------------------------------
 # Create a transaction that creates our spacebucks
 
 # read the compiled Spacebuck.nockma file
@@ -13,8 +25,9 @@ nockma = File.read!(".compiled/Spacebuck.nockma")
 # run the nock code in the client by submitting it
 payload = %{program: Base.encode64(nockma)}
 
-%{body: %{"io" => _hints, "result" => transaction}} =
-  Req.post!("#{host}/nock/prove", json: payload)
+%{body: %{"io" => hints, "result" => transaction}} = Req.post!("#{host}/nock/prove", json: payload)
+
+IO.inspect hints, label: "hints prove spacebuck.nockma"
 
 # ----------------------------------------------------------------------------
 # Submit the transaction to the mempool to make the spacebucks appear.

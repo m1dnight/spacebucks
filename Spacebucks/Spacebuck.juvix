@@ -1,18 +1,19 @@
 module Spacebucks.Spacebuck;
 
-
 import Stdlib.Prelude open;
 import Applib open;
 import Anoma.Encode open;
-
+import Stdlib.Debug as Debug;
 
 -- ### Module, imports ###
 
---- A logic function that is always valid.
-logic : Logic := Logic.mk \{_ := true};
+
+logicFunction  (args : Logic.Args) : Bool :=
+Debug.trace args >-> true;
 
 mkSpacebuck
   (nonce : Nonce)
+  (logic : Logic)
   (message : String)
   {ephemeral : Bool := false}
   : Resource :=
@@ -27,22 +28,23 @@ mkSpacebuck
     unusedRandSeed := 0;
   };
 
-
 spacebuckTransaction
-  {M : Type -> Type} -- polymorphic function with type parameter M
-  {{Monad M}} -- additional information for type parameter M
-  {{Tx M}} -- random number generator needs side effects / Monad
+  {M : Type -> Type}
+  -- polymorphic function with type parameter M
+  {{Monad M}}
+  -- additional information for type parameter M
+  {{Tx M}}
+  -- random number generator needs side effects / Monad
+  (logic : Logic)
   (nonce : Nonce)
   (label : String)
   : M Transaction :=
   let
-  newResource := mkSpacebuck nonce label;
-  in
-  mkTransactionNoPublicData@{
-    consumed := [newResource@Resource{ephemeral := true}];
-    created := [newResource]
-  };
-
+    newResource := mkSpacebuck nonce logic label;
+  in mkTransactionNoPublicData@{
+       consumed := [newResource@Resource{ephemeral := true}];
+       created := [newResource];
+     };
 
 ctx : TxContext :=
   TxContext.mk@{
@@ -50,5 +52,8 @@ ctx : TxContext :=
     currentRoot := CommitmentRoot.fromNat 0;
   };
 
-main : TransactionRequest :=
-  TransactionRequest.build 0 ctx (spacebuckTransaction (Nonce.fromAnomaAtom 0) "Hello World!\n");
+main (logic : Logic) : TransactionRequest :=
+  TransactionRequest.build
+    0
+    ctx
+    (spacebuckTransaction logic (Nonce.fromAnomaAtom 0) "Hello World!\n");

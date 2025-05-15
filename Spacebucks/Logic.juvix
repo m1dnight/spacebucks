@@ -1,0 +1,13 @@
+module Spacebucks.Logic;
+
+import Stdlib.Prelude open;
+import Applib open;
+import Spacebucks.Spacebuck open;
+import Stdlib.Debug as Debug;
+
+type LogicWrapper :=
+  mk@{
+    logic : Logic;
+  };
+
+main : LogicWrapper := (Debug.trace "yeet") >-> LogicWrapper.mk (Logic.mk logicFunction);
