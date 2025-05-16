@@ -3,13 +3,34 @@ module Spacebucks.Spacebuck;
 import Stdlib.Prelude open;
 import Applib open;
 import Anoma.Encode open;
-import Stdlib.Debug as Debug;
+import Stdlib.Debug.Trace open;
 
 -- ### Module, imports ###
 
-
-logicFunction  (args : Logic.Args) : Bool :=
-Debug.trace args >-> true;
+-- The logic function is called in every transaction that tries to either
+-- consume or create a resource in Spacebucks.
+--
+-- So, given a Spacebuck, the logic function should verify that:
+--
+-- 1. If the resource is ephemeral, it can be consumed.
+-- 2. If the resource is not ephemeral, and it is consumed, the resource can no
+--    longer be consumed.
+-- 3. The resource is not ephemeral, and is
+logicFunction (args : Logic.Args) : Bool :=
+  trace "beginning"
+    >-> trace "isConsumed"
+    >-> trace (Logic.Args.isConsumed args)
+    >-> trace (Resource.nonce (Logic.Args.self args))
+    >-> trace (listMap Resource.nonce (Logic.Args.consumed args))
+    >-> trace (listMap Resource.nonce (Logic.Args.created args))
+    >-> trace (length (Logic.Args.created args))
+    >-> trace (Logic.Args.appData args)
+    >-> trace (Resource.ephemeral (Logic.Args.self args))
+    >-> trace "ending"
+    >-> let
+    isEphemeral := Resource.ephemeral (Logic.Args.self args);
+    in
+    trace isEphemeral >-> true;
 
 mkSpacebuck
   (nonce : Nonce)
@@ -36,15 +57,21 @@ spacebuckTransaction
   {{Tx M}}
   -- random number generator needs side effects / Monad
   (logic : Logic)
-  (nonce : Nonce)
   (label : String)
   : M Transaction :=
-  let
-    newResource := mkSpacebuck nonce logic label;
-  in mkTransactionNoPublicData@{
-       consumed := [newResource@Resource{ephemeral := true}];
-       created := [newResource];
-     };
+  do {
+    ctx <- getTxContext;
+    nonce1 <- genRandomNonce;
+    nonce2 <- genRandomNonce;
+    let
+      newResource := mkSpacebuck nonce1 logic label;
+    in
+    mkTransactionNoPublicData@{
+      consumed :=
+        [newResource@Resource{ephemeral := true; nonce := Nonce.toRaw nonce2}];
+      created := [newResource];
+    };
+  };
 
 ctx : TxContext :=
   TxContext.mk@{
@@ -53,7 +80,4 @@ ctx : TxContext :=
   };
 
 main (logic : Logic) : TransactionRequest :=
-  TransactionRequest.build
-    0
-    ctx
-    (spacebuckTransaction logic (Nonce.fromAnomaAtom 0) "Hello World!\n");
+  TransactionRequest.build 0 ctx (spacebuckTransaction logic "Hello World!\n");

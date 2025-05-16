@@ -10,4 +10,4 @@ type LogicWrapper :=
     logic : Logic;
   };
 
-main : LogicWrapper := (Debug.trace "yeet") >-> LogicWrapper.mk (Logic.mk logicFunction);
+main : LogicWrapper := (Debug.trace 1) >-> LogicWrapper.mk (Logic.mk logicFunction);
