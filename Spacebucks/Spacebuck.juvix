@@ -12,9 +12,8 @@ import Stdlib.Debug.Trace open;
 --
 -- So, given a Spacebuck, the logic function should verify that:
 --
--- 1. If the resource is ephemeral, it can be consumed.
--- 2. If the resource is not ephemeral, and it is consumed, the resource can no
---    longer be consumed.
+-- 1. If the resource is not being consumed, it can be creatd.
+-- 2. If the resource is ephemeral, it can be created.
 -- 3. The resource is not ephemeral, and is
 logicFunction (args : Logic.Args) : Bool :=
   trace "beginning"
@@ -28,9 +27,11 @@ logicFunction (args : Logic.Args) : Bool :=
     >-> trace (Resource.ephemeral (Logic.Args.self args))
     >-> trace "ending"
     >-> let
-    isEphemeral := Resource.ephemeral (Logic.Args.self args);
-    in
-    trace isEphemeral >-> true;
+          isConsumed := Logic.Args.isConsumed args;
+          isEphemeral := Resource.ephemeral (Logic.Args.self args);
+        in if
+          | isEphemeral || isConsumed := true
+          | else := trace isEphemeral >-> true;
 
 mkSpacebuck
   (nonce : Nonce)
