@@ -1,0 +1,4 @@
+anoma: https://github.com/anoma/anoma.git
+anoma_branch: origin/m1dnight/kudos-examples
+# juvix: https://github.com/anoma/juvix-nightly-builds/releases/download/nightly-2025-05-09-0.6.10-9692fe8/juvix-darwin-aarch64.tar.gz
+juvix: https://github.com/anoma/juvix-nightly-builds/releases/download/nightly-2025-05-09-0.6.10-9692fe8/juvix-darwin-x86_64.tar.gz

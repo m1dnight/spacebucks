@@ -1,4 +1,4 @@
-module Spacebucks.Spacebuck;
+module Spacebucks.SpacebuckOwner;
 
 import Stdlib.Prelude open;
 import Applib open;
@@ -29,13 +29,12 @@ logicFunction (args : Logic.Args) : Bool :=
     >-> trace (Logic.Args.appData args)
     >-> trace (Resource.ephemeral (Logic.Args.self args))
     >-> trace "ending"
-    >-> true;
-    -- >-> let
-    --       isConsumed := Logic.Args.isConsumed args;
-    --       isEphemeral := Resource.ephemeral (Logic.Args.self args);
-    --     in if
-    --       | isEphemeral || isConsumed := true
-    --       | else := trace isEphemeral >-> true;
+    >-> let
+          isConsumed := Logic.Args.isConsumed args;
+          isEphemeral := Resource.ephemeral (Logic.Args.self args);
+        in if
+          | isEphemeral || isConsumed := true
+          | else := trace isEphemeral >-> true;
 
 -- a transaction to create should only be valid if the
 -- creator of the object is the same as the originator
