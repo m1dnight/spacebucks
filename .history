@@ -1,3 +1,6 @@
+:t (1, 2)
+(1, 2)
+:load ./.juvix-build/0.6.10/deps/4840c75d24c71a4510ee7338beea31f9f2a65ddc71eab3907b676813c23e321a/Stdlib/Prelude.juvix
 :load ./.juvix-build/0.6.10/deps/4840c75d24c71a4510ee7338beea31f9f2a65ddc71eab3907b676813c23e321a/Stdlib/Prelude.juvix
 length [1;2];
 :load ./.juvix-build/0.6.10/deps/4840c75d24c71a4510ee7338beea31f9f2a65ddc71eab3907b676813c23e321a/Stdlib/Prelude.juvix

@@ -1,9 +1,18 @@
 Mix.install([
-  {:req, "~> 0.5.0"}
+  {:req, "~> 0.5.0"},
+  {:eddy, "~> 1.0.0"}
 ])
 
 host = "http://localhost:4000"
 
+# -----------------------------------------------------------
+# Create a keypair for the user.
+
+private_key = Eddy.generate_key(encoding: :raw)
+public_key = Eddy.get_pubkey(private_key, encoding: :raw)
+
+IO.inspect(private_key, label: "priv key")
+IO.inspect(public_key, label: "public key")
 # ----------------------------------------------------------------------------
 # Prove the logic function for Spacebucks to pass in as argument
 
@@ -26,7 +35,14 @@ hints
 nockma = File.read!(".compiled/Spacebuck.nockma")
 
 # run the nock code in the client by submitting it
-payload = %{program: Base.encode64(nockma), private_inputs: [compiled_logic]}
+payload = %{
+  program: Base.encode64(nockma),
+  public_inputs: [
+    %{noun: compiled_logic},
+    %{raw: Base.encode64(public_key)},
+    %{raw: Base.encode64(private_key)}
+  ]
+}
 
 %{body: %{"io" => hints, "result" => transaction}} =
   Req.post!("#{host}/nock/prove", json: payload)

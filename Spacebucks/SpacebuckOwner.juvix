@@ -62,9 +62,7 @@ mkSpacebuck
 spacebuckTransaction
   {M : Type -> Type}
   {{Monad M}}
-  -- additional information for type parameter M
   {{Tx M}}
-  -- random number generator needs side effects / Monad
   (logic : Logic)
   (label : String)
   : M Transaction :=
@@ -73,6 +71,7 @@ spacebuckTransaction
     nonce1 <- genRandomNonce;
     nonce2 <- genRandomNonce;
     let
+      pubKey : ExternalIdentity := Identity.external (TxContext.caller ctx);
       newResource := mkSpacebuck nonce1 logic label;
     in
     mkTransactionNoPublicData@{

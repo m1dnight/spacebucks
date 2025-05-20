@@ -1,0 +1,37 @@
+name: Run example
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:  # Allows manual triggering
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    services:
+      anoma:
+        image: m1dnight/anoma:latest
+        ports:
+          - 4000:4000
+
+  app-jobs:
+    needs: setup
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app: [app1, app2, app3, app4, app5]
+      fail-fast: false  # Allows other jobs to continue even if one fails
+      max-parallel: 5  # Run all 5 jobs concurrently
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run ${{ matrix.app }}
+        run: |
+          echo "Running ${{ matrix.app }} with Anoma service"
+          # Your application-specific commands here
+          # For example:
+          # ./scripts/run-tests.sh --app ${{ matrix.app }}
