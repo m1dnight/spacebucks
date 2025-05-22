@@ -102,10 +102,9 @@ create-signature (message : String) (identity : Identity) : Signature :=
        unSignature := signature;
      };
 
-
 -- create a signature wrapped in an AppData.Value record.
 -- This is necessary to store it in the app data.
-create-signature-value (identity : Identity) : AppData.Value :=
+create-signature-value (identity : Identity) : AnomaAtom :=
   let
     signature : Signature := create-signature "spacebucks" identity;
     signature-atom : AnomaAtom :=
@@ -115,34 +114,40 @@ create-signature-value (identity : Identity) : AppData.Value :=
         atom := signature-atom;
         deletionCriteria := true;
       };
-  in signature-value;
+  in (builtinAnomaEncode >> AnomaAtom.fromNat) signature-value;
 
+-- create an appdata entry for the given nullifier
 create-app-data-entry-nullifier
   (identity : Identity)
   (nullifier : Nullifier)
-  : Pair RawTag (List AppData.Value) :=
+  : Pair RawTag (List AnomaAtom) :=
   let
-    signature-value : AppData.Value := create-signature-value identity;
+    signature-value : AnomaAtom := create-signature-value identity;
     signature-key : RawTag := Nullifier.toRawTag nullifier;
   in signature-key, [signature-value];
 
+-- create an appdata entry for the given commitment
 create-app-data-entry-commitment
   (identity : Identity)
   (commitment : Commitment)
-  : Pair RawTag (List AppData.Value) :=
+  : Pair RawTag (List AnomaAtom) :=
   let
-    signature-value : AppData.Value := create-signature-value identity;
-
+    signature-value : AnomaAtom := create-signature-value identity;
     signature-key : RawTag := Commitment.toRawTag commitment;
   in signature-key, [signature-value];
 
+-- create the app data for the given nullifiers and commitments
 create-app-data
   (identity : Identity)
   (nullifiers : List Nullifier)
   (commitments : List Commitment)
-  : List (Pair RawTag (List AppData.Value)) :=
-  map (create-app-data-entry-nullifier identity) nullifiers
-    ++ map (create-app-data-entry-commitment identity) commitments;
+  : Map RawTag (List AnomaAtom) :=
+  let
+    nullifiers : List (Pair RawTag (List AnomaAtom)) :=
+      map (create-app-data-entry-nullifier identity) nullifiers;
+    commitments : List (Pair RawTag (List AnomaAtom)) :=
+      map (create-app-data-entry-commitment identity) commitments;
+  in Map.fromList (nullifiers ++ commitments);
 
 create-spacebucks-transaction
   {M : Type -> Type}
@@ -158,21 +163,31 @@ create-spacebucks-transaction
     let
       label := Label.mk 0;
       quantity := 10;
-      nonce := Nonce.toRaw nonce1;
-      newResource := make-spacebuck logic identity label quantity nonce;
+
+      -- create the created resource and its commitment
+      nonce-created := Nonce.toRaw nonce1;
+      created-resource := make-spacebuck logic identity label quantity nonce-created;
+
+      -- create the consumed ephemeral resource and its nullifier
+      nonce-consumed := Nonce.toRaw nonce2;
+      consumed-resource : Resource := created-resource@Resource{ephemeral := true; nonce := nonce-consumed};
+
+      -- create commitments and nullifiers
+      commitments := commitments-for-created [created-resource];
+      nullifiers := nullifiers-for-consumed [consumed-resource];
+      -- create the action for this transaction
       action : Action :=
         Action.mk@{
-          commitments := [];
-          nullifiers := [];
+          commitments := commitments;
+          nullifiers := nullifiers;
           resourceLogicProofs := AnomaMap.fromList [];
           complianceUnits := AnomaSet.fromList [];
-          appData := AppData.empty;
+          appData := AppData.fromMap (create-app-data identity [] []);
         };
     in
     mkTransactionNoPublicData@{
-      consumed :=
-        [newResource@Resource{ephemeral := true; nonce := Nonce.toRaw nonce2}];
-      created := [newResource];
+      consumed := [consumed-resource];
+      created := [created-resource];
     };
   };
 
