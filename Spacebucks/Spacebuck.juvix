@@ -115,41 +115,41 @@ create-signature-value (identity : Identity) : AppData.Value :=
         atom := signature-atom;
         deletionCriteria := true;
       };
-  in signature-atom;
+  in signature-value;
 
 create-app-data-entry-nullifier
-  (creator : Identity)
+  (identity : Identity)
   (nullifier : Nullifier)
   : Pair RawTag (List AppData.Value) :=
   let
-    signature-value : create-signature-value identity;
+    signature-value : AppData.Value := create-signature-value identity;
     signature-key : RawTag := Nullifier.toRawTag nullifier;
   in signature-key, [signature-value];
 
 create-app-data-entry-commitment
-  (creator : Identity)
+  (identity : Identity)
   (commitment : Commitment)
   : Pair RawTag (List AppData.Value) :=
   let
-    signature-value : create-signature-value identity;
+    signature-value : AppData.Value := create-signature-value identity;
 
     signature-key : RawTag := Commitment.toRawTag commitment;
   in signature-key, [signature-value];
 
 create-app-data
-  (creator : Identity)
+  (identity : Identity)
   (nullifiers : List Nullifier)
   (commitments : List Commitment)
   : List (Pair RawTag (List AppData.Value)) :=
-  map (create-app-data-entry-nullifier creator) nullifiers
-    ++ map (create-app-data-entry-commitment creator) commitments;
+  map (create-app-data-entry-nullifier identity) nullifiers
+    ++ map (create-app-data-entry-commitment identity) commitments;
 
 create-spacebucks-transaction
   {M : Type -> Type}
   {{Monad M}}
   {{Tx M}}
   (logic : Logic)
-  (creator : Identity)
+  (identity : Identity)
   : M Transaction :=
   do {
     ctx <- getTxContext;
@@ -159,7 +159,7 @@ create-spacebucks-transaction
       label := Label.mk 0;
       quantity := 10;
       nonce := Nonce.toRaw nonce1;
-      newResource := make-spacebuck logic creator label quantity nonce;
+      newResource := make-spacebuck logic identity label quantity nonce;
       action : Action :=
         Action.mk@{
           commitments := [];
