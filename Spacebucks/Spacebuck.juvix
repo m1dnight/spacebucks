@@ -99,14 +99,24 @@ create-signature
        unSignature := signature;
      };
 
-create-app-data (creator : Identity) (nullifiers : List Nullifier) : AppData :=
-  let
+create-app-data-entry (creator : Identity) (nullifier : Nullifier) : (Pair RawTag (List AppData.Value)) :=
+    let
     private-key : InternalIdentity := Identity.internal creator;
     signature : Signature := create-signature "this is a spacebuck" private-key;
     signature-atom : AnomaAtom := AnomaAtom.fromNat (builtinAnomaEncode signature);
     signature-value : AppData.Value := AppData.Value.mk@{ atom := signature-atom; deletionCriteria := true; };
+    signature-key : RawTag := Nullifier.toRawTag nullifier;
   in
-    todo;
+    (signature-key, [signature-value]);
+-- create-app-data (creator : Identity) (nullifiers : List Nullifier) : AppData :=
+--   let
+--     private-key : InternalIdentity := Identity.internal creator;
+--     signature : Signature := create-signature "this is a spacebuck" private-key;
+--     signature-atom : AnomaAtom := AnomaAtom.fromNat (builtinAnomaEncode signature);
+--     signature-value : AppData.Value := AppData.Value.mk@{ atom := signature-atom; deletionCriteria := true; };
+--     signature-key : RawTag :=
+--   in
+--     todo;
 
 create-spacebucks-transaction
   {M : Type -> Type}
