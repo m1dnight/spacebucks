@@ -164,6 +164,8 @@ create-spacebucks-transaction
       label := Label.mk 0;
       quantity := 10;
 
+      -- the current root passed in via the transaction context
+      current-root : CommitmentRoot := TxContext.currentRoot ctx;
       -- create the created resource and its commitment
       nonce-created := Nonce.toRaw nonce1;
       created-resource := make-spacebuck logic identity label quantity nonce-created;
@@ -176,14 +178,19 @@ create-spacebucks-transaction
       commitments := commitments-for-created [created-resource];
       nullifiers := nullifiers-for-consumed [consumed-resource];
       -- create the action for this transaction
-      action : Action :=
-        Action.mk@{
-          commitments := commitments;
-          nullifiers := nullifiers;
-          resourceLogicProofs := AnomaMap.fromList [];
-          complianceUnits := AnomaSet.fromList [];
-          appData := AppData.fromMap (create-app-data identity [] []);
-        };
+      -- action : Action :=
+      --   Action.mk@{
+      --     commitments := commitments;
+      --     nullifiers := nullifiers;
+      --     resourceLogicProofs := AnomaMap.fromList [];
+      --     complianceUnits := AnomaSet.fromList [];
+      --     appData := AppData.fromMap (create-app-data identity [] []);
+      --   };
+      action : Action := Action.create@{
+        consumed := [RootedNullifiableResource.Transparent.mk current-root consumed-resource];
+        created := [created-resource];
+        appData := AppData.fromMap (create-app-data identity nullifiers commitments);
+      }
     in
     mkTransactionNoPublicData@{
       consumed := [consumed-resource];
