@@ -99,13 +99,14 @@ create-spacebucks-transaction
       quantity := 10;
       nonce := Nonce.toRaw nonce1;
       newResource := make-spacebuck logic creator label quantity nonce;
-      action : Action := Action.mk@{
-        commitments := [];
-        nullifiers := [];
-        resourceLogicProofs := AnomaMap.fromList [];
-        complianceUnits := AnomaSet.fromList [];
-        appData := AppData.empty;
-      };
+      action : Action :=
+        Action.mk@{
+          commitments := [];
+          nullifiers := [];
+          resourceLogicProofs := AnomaMap.fromList [];
+          complianceUnits := AnomaSet.fromList [];
+          appData := AppData.empty;
+        };
     in
     mkTransactionNoPublicData@{
       consumed :=
@@ -146,6 +147,10 @@ make-spacebuck-value (creator : ExternalIdentity) : SpacebuckValue :=
 -- quantity: quantity of the resource, e.g., how many spacebucks.
 --
 -- nonce: the nonce of the resource. TODO
+
+nullifiers-for-consumed (resources : List Resource) : List Nullifier :=
+  map Resource.Transparent.nullifier resources;
+
 make-spacebuck
   (resource-logic : Logic)
   (creator : Identity)
@@ -213,8 +218,6 @@ main
 -- Questions
 -- =========
 --  What is a nonce for a resource? What purpose does it serve?
-
-
 
 -- Create a transaction to transfer resource R from A to B
 -- =======================================================
