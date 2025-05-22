@@ -84,39 +84,45 @@ logicFunction (args : Logic.Args) : Bool :=
 -- ----------------------------------------------------------------------------
 --  Create a transaction to mint some spacebucks.
 
+-- create a list of nullifiers for the given list of resources.
 nullifiers-for-consumed (resources : List Resource) : List Nullifier :=
   map Resource.Transparent.nullifier resources;
 
+-- create a list of commitments for a list of resources.
 commitments-for-created (resources : List Resource) : List Commitment :=
   map (rawCommitment >> Commitment.fromNat) resources;
 
-create-signature
-  (message : String) (private-key : InternalIdentity) : Signature :=
+-- create a signature for a message and the given identity.
+create-signature (message : String) (identity : Identity) : Signature :=
   let
+    private-key : InternalIdentity := Identity.internal identity;
     key-bytes : ByteArray := InternalIdentity.toByteArray private-key;
     signature : ByteArray := SystemBuiltins.anomaSignDetached message key-bytes;
   in Signature.mk@{
        unSignature := signature;
      };
 
-create-app-data-entry-nullifier
-  (creator : Identity)
-  (nullifier : Nullifier)
-  : Pair RawTag (List AppData.Value) :=
+
+-- create a signature wrapped in an AppData.Value record.
+-- This is necessary to store it in the app data.
+create-signature-value (identity : Identity) : AppData.Value :=
   let
-    private-key : InternalIdentity := Identity.internal creator;
-
-    signature : Signature := create-signature "this is a spacebuck" private-key;
-
+    signature : Signature := create-signature "spacebucks" identity;
     signature-atom : AnomaAtom :=
       AnomaAtom.fromNat (builtinAnomaEncode signature);
-
     signature-value : AppData.Value :=
       AppData.Value.mk@{
         atom := signature-atom;
         deletionCriteria := true;
       };
+  in signature-atom;
 
+create-app-data-entry-nullifier
+  (creator : Identity)
+  (nullifier : Nullifier)
+  : Pair RawTag (List AppData.Value) :=
+  let
+    signature-value : create-signature-value identity;
     signature-key : RawTag := Nullifier.toRawTag nullifier;
   in signature-key, [signature-value];
 
@@ -125,18 +131,7 @@ create-app-data-entry-commitment
   (commitment : Commitment)
   : Pair RawTag (List AppData.Value) :=
   let
-    private-key : InternalIdentity := Identity.internal creator;
-
-    signature : Signature := create-signature "this is a spacebuck" private-key;
-
-    signature-atom : AnomaAtom :=
-      AnomaAtom.fromNat (builtinAnomaEncode signature);
-
-    signature-value : AppData.Value :=
-      AppData.Value.mk@{
-        atom := signature-atom;
-        deletionCriteria := true;
-      };
+    signature-value : create-signature-value identity;
 
     signature-key : RawTag := Commitment.toRawTag commitment;
   in signature-key, [signature-value];
@@ -146,7 +141,8 @@ create-app-data
   (nullifiers : List Nullifier)
   (commitments : List Commitment)
   : List (Pair RawTag (List AppData.Value)) :=
-  map (create-app-data-entry-nullifier creator) nullifiers ++ map (create-app-data-entry-commitment creator) commitments;
+  map (create-app-data-entry-nullifier creator) nullifiers
+    ++ map (create-app-data-entry-commitment creator) commitments;
 
 create-spacebucks-transaction
   {M : Type -> Type}
