@@ -7,6 +7,7 @@ import Stdlib.Debug.Trace open;
 import Anoma.Identity.External open;
 import Anoma.Identity.Internal open;
 import BaseLayer.ResourceMachine open;
+import Anoma.Builtin.System as SystemBuiltins open;
 
 -- ----------------------------------------------------------------------------
 --  Helpers
@@ -83,6 +84,30 @@ logicFunction (args : Logic.Args) : Bool :=
 -- ----------------------------------------------------------------------------
 --  Create a transaction to mint some spacebucks.
 
+nullifiers-for-consumed (resources : List Resource) : List Nullifier :=
+  map Resource.Transparent.nullifier resources;
+
+commitments-for-created (resources : List Resource) : List Commitment :=
+  map (rawCommitment >> Commitment.fromNat) resources;
+
+create-signature
+  (message : String) (private-key : InternalIdentity) : Signature :=
+  let
+    key-bytes : ByteArray := InternalIdentity.toByteArray private-key;
+    signature : ByteArray := SystemBuiltins.anomaSignDetached message key-bytes;
+  in Signature.mk@{
+       unSignature := signature;
+     };
+
+create-app-data (creator : Identity) (nullifiers : List Nullifier) : AppData :=
+  let
+    private-key : InternalIdentity := Identity.internal creator;
+    signature : Signature := create-signature "this is a spacebuck" private-key;
+    signature-atom : AnomaAtom := AnomaAtom.fromNat (builtinAnomaEncode signature);
+    signature-value : AppData.Value := AppData.Value.mk@{ atom := signature-atom; deletionCriteria := true; };
+  in
+    todo;
+
 create-spacebucks-transaction
   {M : Type -> Type}
   {{Monad M}}
@@ -147,19 +172,6 @@ make-spacebuck-value (creator : ExternalIdentity) : SpacebuckValue :=
 -- quantity: quantity of the resource, e.g., how many spacebucks.
 --
 -- nonce: the nonce of the resource. TODO
-
-nullifiers-for-consumed (resources : List Resource) : List Nullifier :=
-  map Resource.Transparent.nullifier resources;
-
-commitments-for-created (resources : List Resource) : List Commitment :=
-  map (rawCommitment >> Commitment.fromNat) resources;
-
-create-signature (message : String) (private-key : InternalIdentity) : Signature :=
-  let
-    key-bytes : ByteArray := InternalIdentity.toByteArray private-key;
-    signature : ByteArray := SystemBuiltins.anomaSignDetached message key-bytes;
-  in
-    Signature.mk@{ unSignature := signature };
 
 make-spacebuck
   (resource-logic : Logic)
