@@ -151,6 +151,16 @@ make-spacebuck-value (creator : ExternalIdentity) : SpacebuckValue :=
 nullifiers-for-consumed (resources : List Resource) : List Nullifier :=
   map Resource.Transparent.nullifier resources;
 
+commitments-for-created (resources : List Resource) : List Commitment :=
+  map (rawCommitment >> Commitment.fromNat) resources;
+
+create-signature (message : String) (private-key : InternalIdentity) : Signature :=
+  let
+    key-bytes : ByteArray := InternalIdentity.toByteArray private-key;
+    signature : ByteArray := SystemBuiltins.anomaSignDetached message key-bytes;
+  in
+    Signature.mk@{ unSignature := signature };
+
 make-spacebuck
   (resource-logic : Logic)
   (creator : Identity)
