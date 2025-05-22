@@ -1,0 +1,41 @@
+module Spacebucks.Test;
+
+import Stdlib.Prelude open;
+import Applib open;
+import Anoma.Encode open;
+import Stdlib.Debug.Trace open;
+import Anoma.Identity.External open;
+import Anoma.Identity.Internal open;
+
+type SpacebuckValue :=
+  mkSpacebuckValue@{
+    creator : ExternalIdentity;
+    foobar : String;
+  };
+
+make-spacebuck-value (creator : Identity) : SpacebuckValue :=
+  SpacebuckValue.mkSpacebuckValue@{
+    creator := Identity.external creator;
+    foobar := "test";
+  };
+
+main : Bool :=
+  let
+    identity := Universal.identity;
+    spacebuck := make-spacebuck-value identity;
+    encoded := builtinAnomaEncode spacebuck;
+    atom := AnomaAtom.fromNat encoded;
+    decoded : SpacebuckValue := builtinAnomaDecode (AnomaAtom.toNat atom);
+  in trace identity
+    >-> trace spacebuck
+    >-> trace encoded
+    >-> trace atom
+    >-> trace decoded
+    >-> true;
+
+
+-- atom
+-- logic.nockma hint: : <<0, 84, 42, 40, 8, 160, 127, 71, 237, 132, 215, 217, 150, 180, 69, 108, 20, 21,
+--   90, 229, 173, 97, 174, 76, 166, 226, 174, 67, 124, 200, 84, 7, 24, 41, 116,
+--   49, 75, 59, 5, 62, 93, 217, 28, 29>>
+--  builtinAnomaDecode {SpacebuckValue}  (AnomaAtom.toNat (AnomaAtom.fromNat (builtinAnomaEncode (make-spacebuck-value Universal.identity))))

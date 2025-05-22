@@ -1,0 +1,81 @@
+module Spacebucks.Transfer;
+
+import Stdlib.Prelude open;
+import Applib open;
+import Anoma.Encode open;
+import Stdlib.Debug.Trace open;
+import Anoma.Identity.External open;
+import Anoma.Identity.Internal open;
+import Spacebucks.Spacebuck open;
+
+-- ----------------------------------------------------------------------------
+--  Helpers
+
+change-owner (resource : Resource) (new-owner : ExternalIdentity) : Resource :=
+  let
+    new-value : SpacebuckValue := make-spacebuck-value new-owner;
+    atom : AnomaAtom := encode-atom new-value;
+  in resource@Resource{value := atom};
+
+-- ----------------------------------------------------------------------------
+--  Transfer Transaction
+
+transfer-spacebucks-transaction
+  {M : Type -> Type}
+  {{Monad M}}
+  {{Tx M}}
+  (logic : Logic)
+  (creator : Identity)
+  (receiver : ExternalIdentity)
+  (resource : Resource)
+  : M Transaction :=
+  do {
+    ctx <- getTxContext;
+    nonce1 <- genRandomNonce;
+    nonce2 <- genRandomNonce;
+    let
+      new-resource : Resource := change-owner resource receiver;
+    in
+    mkTransactionNoPublicData@{
+      consumed := [resource];
+      created := [new-resource];
+    };
+  };
+
+-- ----------------------------------------------------------------------------
+--  Main function
+
+main
+  (logic : Logic)
+  (sender-public : ByteArray)
+  (sender-private : ByteArray)
+  (receiver-public : ByteArray)
+  (resource : Resource)
+  (latest-root : CommitmentRoot)
+  : TransactionRequest :=
+  trace latest-root >-> let
+    -- parse the public and private key from the arguments and create the caller
+    sender-public : ExternalIdentity :=
+      ExternalIdentity.fromByteArray sender-public;
+    sender-private : InternalIdentity :=
+      InternalIdentity.fromByteArray sender-private;
+    sender : Identity :=
+      Identity.mk@{
+        internal := sender-private;
+        external := sender-public;
+      };
+
+    -- receiver's public key
+    receiver : ExternalIdentity :=
+      ExternalIdentity.fromByteArray receiver-public;
+
+    -- create the transaction context which holds the caller and the current root
+    context : TxContext :=
+      TxContext.mk@{
+        caller := sender;
+        currentRoot := latest-root;
+      };
+  in TransactionRequest.build
+    0
+    context
+    (transfer-spacebucks-transaction logic sender receiver resource);

@@ -6,32 +6,79 @@ import Anoma.Encode open;
 import Stdlib.Debug.Trace open;
 import Anoma.Identity.External open;
 import Anoma.Identity.Internal open;
+import BaseLayer.ResourceMachine open;
 
--- ### Module, imports ###
+-- ----------------------------------------------------------------------------
+--  Helpers
 
--- The logic function is called in every transaction that tries to either
--- consume or create a resource in Spacebucks.
---
--- So, given a Spacebuck, the logic function should verify that:
---
--- 1. If the resource is not being consumed, it can be creatd.
--- 2. If the resource is ephemeral, it can be created.
--- 3. The resource is not ephemeral, and is
+-- decode an atom into another type.
+decode-atom {T} (atom : AnomaAtom) : T :=
+  builtinAnomaDecode (AnomaAtom.toNat atom);
 
--- if a value influences the kind, it should go in label
--- if it does not, it should go into value (kind of meta-data for a resource)
+encode-atom {T} (value : T) : AnomaAtom :=
+  AnomaAtom.fromNat (builtinAnomaEncode value);
+
+-- Returns the owner of a spacebuck resource.
+-- The owner is defined by their public key.
+spacebuck-owner (resource : Resource) : ExternalIdentity :=
+  let
+    value := Resource.value resource;
+    spacebuck-value : SpacebuckValue := decode-atom value;
+    owner : ExternalIdentity := SpacebuckValue.owner spacebuck-value;
+  in owner;
+
+-- ----------------------------------------------------------------------------
+--  Logic function
+
+-- validate an ephemeral consumed resource
+validate-ephemeral-consumed-resource (args : Logic.Args) : Bool :=
+  let
+    x := trace "validate-ephemeral-consumed-resource" >-> 1;
+    owner : ExternalIdentity := spacebuck-owner (Logic.Args.self args);
+  in true;
+
+-- validate an ephemeral created resource
+validate-ephemeral-created-resource (args : Logic.Args) : Bool :=
+  let
+    x := trace "validate-ephemeral-created-resource" >-> 1;
+    owner : ExternalIdentity := spacebuck-owner (Logic.Args.self args);
+  in true;
+
+-- validate a consumed resource
+validate-non-ephemeral-consumed-resource (args : Logic.Args) : Bool :=
+  let
+    x := trace "validate-non-ephemeral-consumed-resource" >-> 1;
+    owner : ExternalIdentity := spacebuck-owner (Logic.Args.self args);
+  in true;
+
+-- validate a created resource
+validate-non-ephemeral-created-resource (args : Logic.Args) : Bool :=
+  let
+    x := trace "validate-non-ephemeral-created-resource" >-> 1;
+    owner : ExternalIdentity := spacebuck-owner (Logic.Args.self args);
+  in true;
+
 logicFunction (args : Logic.Args) : Bool :=
-  trace "beginning"
-    >-> trace "isConsumed"
-    >-> trace (Logic.Args.isConsumed args)
-    >-> trace (Resource.nonce (Logic.Args.self args))
-    >-> trace (listMap Resource.nonce (Logic.Args.consumed args))
-    >-> trace (listMap Resource.nonce (Logic.Args.created args))
-    >-> trace (length (Logic.Args.created args))
-    >-> trace (Logic.Args.appData args)
-    >-> trace (Resource.ephemeral (Logic.Args.self args))
-    >-> trace "ending"
-    >-> true;
+  -- >-> trace "isConsumed"
+  -- >-> trace (Logic.Args.isConsumed args)
+  -- >-> trace (Resource.nonce (Logic.Args.self args))
+  -- >-> trace (listMap Resource.nonce (Logic.Args.consumed args))
+  -- >-> trace (listMap Resource.nonce (Logic.Args.created args))
+  -- >-> trace (length (Logic.Args.created args))
+  -- >-> trace (Logic.Args.appData args)
+  -- >-> trace (Resource.ephemeral (Logic.Args.self args))
+  -- >-> trace "ending"
+
+  let
+    value := "here";
+    appdata := Logic.Args.appData args;
+    selfTag := RawTag.fromTag (Logic.Args.selfTag args);
+  in trace value >-> trace selfTag >-> true;
+-- in if
+--   | is-ephemeral && is-created := validate-ephemeral-created-resource args
+--   | is-ephemeral := validate-ephemeral-consumed-resource args
+--   | is-created := validate-non-ephemeral-created-resource args
+--   | else := validate-non-ephemeral-consumed-resource args;
 
 -- ----------------------------------------------------------------------------
 --  Create a transaction to mint some spacebucks.
@@ -51,8 +98,14 @@ create-spacebucks-transaction
       label := Label.mk 0;
       quantity := 10;
       nonce := Nonce.toRaw nonce1;
-      value : SpacebuckValue := make-spacebuck-value creator;
       newResource := make-spacebuck logic creator label quantity nonce;
+      action : Action := Action.mk@{
+        commitments := [];
+        nullifiers := [];
+        resourceLogicProofs := AnomaMap.fromList [];
+        complianceUnits := AnomaSet.fromList [];
+        appData := AppData.empty;
+      };
     in
     mkTransactionNoPublicData@{
       consumed :=
@@ -60,7 +113,6 @@ create-spacebucks-transaction
       created := [newResource];
     };
   };
-
 
 -- ----------------------------------------------------------------------------
 --  Value for a Spacebuck
@@ -70,12 +122,12 @@ create-spacebucks-transaction
 
 type SpacebuckValue :=
   mkSpacebuckValue@{
-    creator : ExternalIdentity;
+    owner : ExternalIdentity;
   };
 
-make-spacebuck-value (creator : Identity) : SpacebuckValue :=
+make-spacebuck-value (creator : ExternalIdentity) : SpacebuckValue :=
   SpacebuckValue.mkSpacebuckValue@{
-    creator := Identity.external creator;
+    owner := creator;
   };
 
 -- ----------------------------------------------------------------------------
@@ -102,19 +154,22 @@ make-spacebuck
   (nonce : Nonce.Raw)
   : Resource :=
   let
-    spacebuck-value : SpacebuckValue := make-spacebuck-value creator;
-    value : AnomaAtom := (AnomaAtom.fromNat (builtinAnomaEncode spacebuck-value));
-  in
-  Resource.mk@{
-    logic := Encoded.encode resource-logic;
-    label := make-spacebuck-label;
-    value := value;
-    quantity := quantity;
-    ephemeral := true;
-    nonce := nonce;
-    nullifierKeyCommitment := 0;
-    unusedRandSeed := 0;
-  };
+    creator-public : ExternalIdentity := Identity.external creator;
+    spacebuck-value : SpacebuckValue := make-spacebuck-value creator-public;
+    value : AnomaAtom := AnomaAtom.fromNat (builtinAnomaEncode spacebuck-value);
+  in trace "spacebuck-value"
+    >-> trace "value going in"
+    >-> trace value
+    >-> Resource.mk@{
+          logic := Encoded.encode resource-logic;
+          label := make-spacebuck-label;
+          value := value;
+          quantity := quantity;
+          ephemeral := false;
+          nonce := nonce;
+          nullifierKeyCommitment := 0;
+          unusedRandSeed := 0;
+        };
 
 -- ----------------------------------------------------------------------------
 --  Spacebuck Label
@@ -133,6 +188,7 @@ main
   (logic : Logic)
   (publicKey : ByteArray)
   (privateKey : ByteArray)
+  (latest-root : CommitmentRoot)
   : TransactionRequest :=
   let
     -- parse the public and private key from the arguments and create the caller
@@ -147,7 +203,7 @@ main
     context : TxContext :=
       TxContext.mk@{
         caller := creator;
-        currentRoot := CommitmentRoot.fromNat 0;
+        currentRoot := latest-root;
       };
   in TransactionRequest.build
     0
@@ -157,3 +213,21 @@ main
 -- Questions
 -- =========
 --  What is a nonce for a resource? What purpose does it serve?
+
+
+
+-- Create a transaction to transfer resource R from A to B
+-- =======================================================
+
+-- A submits a transaction with parameters [R, A_public_key, A_private_key, B_public_key]
+
+-- In the transaction function:
+
+--   - create a resource R' that has B as the owner
+--   - put actions in the transaction that contain the signature of some message M, signed with A_public_key, and A_private_key
+
+-- The resource logic then verifies this transaction by:
+--   - the resource logic can verify by using:
+--     - the public key in the resource
+--     - the message that was originally signed
+--     - the signature put into the actions in the transaction function
