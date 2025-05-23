@@ -70,11 +70,12 @@ logicFunction (args : Logic.Args) : Bool :=
   -- >-> trace (Resource.ephemeral (Logic.Args.self args))
   -- >-> trace "ending"
 
-  let
-    value := "here";
-    appdata := Logic.Args.appData args;
-    selfTag := RawTag.fromTag (Logic.Args.selfTag args);
-  in trace value >-> trace selfTag >-> true;
+  -- let
+  --   value := "here";
+  --   appdata := Logic.Args.appData args;
+  --   selfTag := RawTag.fromTag (Logic.Args.selfTag args);
+  -- in trace value >-> trace selfTag >-> true;
+  true;
 -- in if
 --   | is-ephemeral && is-created := validate-ephemeral-created-resource args
 --   | is-ephemeral := validate-ephemeral-consumed-resource args
@@ -93,22 +94,26 @@ commitments-for-created (resources : List Resource) : List Commitment :=
   map (rawCommitment >> Commitment.fromNat) resources;
 
 -- create a signature for a message and the given identity.
-create-signature (message : String) (identity : Identity) : Signature :=
-  let
-    private-key : InternalIdentity := Identity.internal identity;
-    key-bytes : ByteArray := InternalIdentity.toByteArray private-key;
-    signature : ByteArray := SystemBuiltins.anomaSignDetached message key-bytes;
-  in Signature.mk@{
-       unSignature := signature;
-     };
+create-signature (message : Nat) (identity : Identity) : Signature :=
+  trace "create-signature"
+    >-> (let
+          private-key : InternalIdentity := Identity.internal identity;
+          key-bytes : ByteArray := InternalIdentity.toByteArray private-key;
+          yyy := trace key-bytes >-> 1;
+          signature : ByteArray :=
+            trace "signing" >-> SystemBuiltins.anomaSignDetached 0 key-bytes;
+        in trace "signed"
+          >-> Signature.mk@{
+                unSignature := signature;
+              });
 
 -- create a signature wrapped in an AppData.Value record.
 -- This is necessary to store it in the app data.
 create-signature-value (identity : Identity) : AnomaAtom :=
   let
-    signature : Signature := create-signature "spacebucks" identity;
+    signature : Signature := create-signature 0 identity;
     signature-atom : AnomaAtom :=
-      AnomaAtom.fromNat (builtinAnomaEncode signature);
+      trace "sig created" >-> AnomaAtom.fromNat (builtinAnomaEncode signature);
     signature-value : AppData.Value :=
       AppData.Value.mk@{
         atom := signature-atom;
@@ -122,9 +127,10 @@ create-app-data-entry-nullifier
   (nullifier : Nullifier)
   : Pair RawTag (List AnomaAtom) :=
   let
-    signature-value : AnomaAtom := create-signature-value identity;
-    signature-key : RawTag := Nullifier.toRawTag nullifier;
-  in signature-key, [signature-value];
+    signature-value : AnomaAtom :=
+      trace "sig val1" >-> create-signature-value identity;
+    signature-key : RawTag := trace "sig val1" >-> Nullifier.toRawTag nullifier;
+  in trace "nullifier" >-> (signature-key, [signature-value]);
 
 -- create an appdata entry for the given commitment
 create-app-data-entry-commitment
@@ -132,8 +138,10 @@ create-app-data-entry-commitment
   (commitment : Commitment)
   : Pair RawTag (List AnomaAtom) :=
   let
-    signature-value : AnomaAtom := create-signature-value identity;
-    signature-key : RawTag := Commitment.toRawTag commitment;
+    signature-value : AnomaAtom :=
+      trace "sig val" >-> create-signature-value identity;
+    signature-key : RawTag :=
+      trace "sig val" >-> Commitment.toRawTag commitment;
   in signature-key, [signature-value];
 
 -- create the app data for the given nullifiers and commitments
@@ -161,22 +169,29 @@ create-spacebucks-transaction
     nonce1 <- genRandomNonce;
     nonce2 <- genRandomNonce;
     let
-      label := Label.mk 0;
+      label := trace 0 >-> Label.mk 0;
       quantity := 10;
 
       -- the current root passed in via the transaction context
       current-root : CommitmentRoot := TxContext.currentRoot ctx;
       -- create the created resource and its commitment
       nonce-created := Nonce.toRaw nonce1;
-      created-resource := make-spacebuck logic identity label quantity nonce-created;
+      created-resource :=
+        make-spacebuck logic identity label quantity nonce-created;
 
       -- create the consumed ephemeral resource and its nullifier
       nonce-consumed := Nonce.toRaw nonce2;
-      consumed-resource : Resource := created-resource@Resource{ephemeral := true; nonce := nonce-consumed};
+      consumed-resource : Resource :=
+        created-resource@Resource{
+          ephemeral := true;
+          nonce := nonce-consumed;
+        };
 
       -- create commitments and nullifiers
-      commitments := commitments-for-created [created-resource];
-      nullifiers := nullifiers-for-consumed [consumed-resource];
+      commitments : List Commitment :=
+        commitments-for-created [created-resource];
+      nullifiers : List Nullifier :=
+        nullifiers-for-consumed [consumed-resource];
       -- create the action for this transaction
       -- action : Action :=
       --   Action.mk@{
@@ -186,16 +201,36 @@ create-spacebucks-transaction
       --     complianceUnits := AnomaSet.fromList [];
       --     appData := AppData.fromMap (create-app-data identity [] []);
       --   };
-      action : Action := Action.create@{
-        consumed := [RootedNullifiableResource.Transparent.mk current-root consumed-resource];
-        created := [created-resource];
-        appData := AppData.fromMap (create-app-data identity nullifiers commitments);
-      }
+      rooted-nullifier :=
+        RootedNullifiableResource.Transparent.mk current-root consumed-resource;
+      appdata-map : Map RawTag (List AnomaAtom) := create-app-data identity nullifiers commitments;
+      appdata : AppData  := AppData.fromMap (create-app-data identity nullifiers commitments);
+
+      action : Action := trace "creating action" >->
+        -- Action.create@{
+        --   consumed := [rooted-nullifier];
+        --   created := [created-resource];
+        --   appData := appdata;
+        -- };
+        Action.create@{
+          consumed := [];
+          created := [];
+          appData := AppData.empty;
+        };
+      -- commitment roots
+      commitment-roots := trace "created action" >-> [current-root];
+
+      -- roots
+      roots := trace "roots" >-> AnomaSet.fromList commitment-roots;
+      actions := trace "actions" >-> AnomaSet.fromList [action];
+
     in
-    mkTransactionNoPublicData@{
-      consumed := [consumed-resource];
-      created := [created-resource];
-    };
+    trace 123
+      >-> pure
+        Transaction.mk@{
+          roots := AnomaSet.fromList commitment-roots;
+          actions := AnomaSet.fromList [action];
+        };
   };
 
 -- ----------------------------------------------------------------------------
@@ -242,19 +277,16 @@ make-spacebuck
     creator-public : ExternalIdentity := Identity.external creator;
     spacebuck-value : SpacebuckValue := make-spacebuck-value creator-public;
     value : AnomaAtom := AnomaAtom.fromNat (builtinAnomaEncode spacebuck-value);
-  in trace "spacebuck-value"
-    >-> trace "value going in"
-    >-> trace value
-    >-> Resource.mk@{
-          logic := Encoded.encode resource-logic;
-          label := make-spacebuck-label;
-          value := value;
-          quantity := quantity;
-          ephemeral := false;
-          nonce := nonce;
-          nullifierKeyCommitment := 0;
-          unusedRandSeed := 0;
-        };
+  in Resource.mk@{
+       logic := Encoded.encode resource-logic;
+       label := make-spacebuck-label;
+       value := value;
+       quantity := quantity;
+       ephemeral := false;
+       nonce := nonce;
+       nullifierKeyCommitment := 0;
+       unusedRandSeed := 0;
+     };
 
 -- ----------------------------------------------------------------------------
 --  Spacebuck Label
@@ -266,6 +298,22 @@ make-spacebuck-label : Label := Label.mk (builtinAnomaEncode "spacebucks");
 -- ----------------------------------------------------------------------------
 --  Main function
 
+fix-raw-private-key (priv-key : ByteArray) : InternalIdentity :=
+  let
+    key-pair := 32, priv-key;
+    key-atom : AnomaAtom := AnomaAtom.fromNat (builtinAnomaEncode key-pair);
+    key-bytes : ByteArray := builtinAnomaDecode (AnomaAtom.toNat key-atom);
+    identity := InternalIdentity.fromByteArray key-bytes;
+  in identity;
+
+fix-raw-public-key (priv-key : ByteArray) : ExternalIdentity :=
+  let
+    key-pair := 32, priv-key;
+    key-atom : AnomaAtom := AnomaAtom.fromNat (builtinAnomaEncode key-pair);
+    key-bytes : ByteArray := builtinAnomaDecode (AnomaAtom.toNat key-atom);
+    identity := ExternalIdentity.fromByteArray key-bytes;
+  in identity;
+
 -- The label of a spacebuck is what uniquely identifies it. If Bob makes a
 -- spacebuck, it's uniquely identified by the pair
 -- (bob_public_key, "spacebuck").
@@ -275,25 +323,29 @@ main
   (privateKey : ByteArray)
   (latest-root : CommitmentRoot)
   : TransactionRequest :=
-  let
-    -- parse the public and private key from the arguments and create the caller
-    public-key : ExternalIdentity := ExternalIdentity.fromByteArray publicKey;
-    private-key : InternalIdentity := InternalIdentity.fromByteArray privateKey;
-    creator : Identity :=
-      Identity.mk@{
-        internal := private-key;
-        external := public-key;
-      };
-    -- create the transaction context which holds the caller and the current root
-    context : TxContext :=
-      TxContext.mk@{
-        caller := creator;
-        currentRoot := latest-root;
-      };
-  in TransactionRequest.build
-    0
-    context
-    (create-spacebucks-transaction logic creator);
+  trace "yeet"
+    >-> let
+          -- wrap the public and private key in a tuple to add in their length
+          -- i have no idea why this is here, but whatever.
+          -- parse the public and private key from the arguments and create the caller
+          public-key := fix-raw-public-key publicKey;
+          private-key := fix-raw-private-key privateKey;
+          -- create the identity record that holds the keypair.
+          creator : Identity :=
+            Identity.mk@{
+              internal := private-key;
+              external := public-key;
+            };
+          -- create the transaction context which holds the caller and the current root
+          context : TxContext :=
+            TxContext.mk@{
+              caller := creator;
+              currentRoot := latest-root;
+            };
+        in TransactionRequest.build
+          0
+          context
+          (create-spacebucks-transaction logic creator);
 
 -- Questions
 -- =========

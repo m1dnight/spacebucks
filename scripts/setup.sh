@@ -1,7 +1,9 @@
 #!/bin/bash
 
 juvix_release="https://github.com/anoma/juvix-nightly-builds/releases/download/nightly-2025-05-09-0.6.10-9692fe8/juvix-darwin-aarch64.tar.gz"
+# juvix_release="https://github.com/anoma/juvix-nightly-builds/releases/download/nightly-2025-03-25-0.6.9-d903721/juvix-darwin-aarch64.tar.gz"
 anoma_branch="origin/m1dnight/kudos-examples"
+anoma_branch="c8c2a385dd916a28982918fdc22da90c409e347a"
 
 # run all commands in the root directory of this repository
 root_dir=$(dirname $(dirname -- "$(readlink -f -- "$BASH_SOURCE")"))

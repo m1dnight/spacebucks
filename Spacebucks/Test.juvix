@@ -6,36 +6,30 @@ import Anoma.Encode open;
 import Stdlib.Debug.Trace open;
 import Anoma.Identity.External open;
 import Anoma.Identity.Internal open;
+import Anoma.Builtin.System as SystemBuiltins open;
+import Anoma.Primitives.FixedSize open;
 
-type SpacebuckValue :=
-  mkSpacebuckValue@{
-    creator : ExternalIdentity;
-    foobar : String;
-  };
+main : Action :=
+  trace "start" >-> let
+    appdata := trace "here here" >-> AppData.empty;
+  in
+     trace "here" >-> Action.create [] [] appdata;
 
-make-spacebuck-value (creator : Identity) : SpacebuckValue :=
-  SpacebuckValue.mkSpacebuckValue@{
-    creator := Identity.external creator;
-    foobar := "test";
-  };
+-- let
+--           priv := InternalIdentity.fromByteArray priv-key;
+--           publ := ExternalIdentity.fromByteArray pub-key;
+--           signed : SystemBuiltins.Internal.SignedMessage := ByteArray.zero 1;
+--           ver : Bool := SystemBuiltins.anomaVerifyDetached signed "yeet" pub-key;
+--         in trace "yeet" >-> "hello";
 
-main : Bool :=
-  let
-    identity := Universal.identity;
-    spacebuck := make-spacebuck-value identity;
-    encoded := builtinAnomaEncode spacebuck;
-    atom := AnomaAtom.fromNat encoded;
-    decoded : SpacebuckValue := builtinAnomaDecode (AnomaAtom.toNat atom);
-  in trace identity
-    >-> trace spacebuck
-    >-> trace encoded
-    >-> trace atom
-    >-> trace decoded
-    >-> true;
-
-
--- atom
--- logic.nockma hint: : <<0, 84, 42, 40, 8, 160, 127, 71, 237, 132, 215, 217, 150, 180, 69, 108, 20, 21,
---   90, 229, 173, 97, 174, 76, 166, 226, 174, 67, 124, 200, 84, 7, 24, 41, 116,
---   49, 75, 59, 5, 62, 93, 217, 28, 29>>
---  builtinAnomaDecode {SpacebuckValue}  (AnomaAtom.toNat (AnomaAtom.fromNat (builtinAnomaEncode (make-spacebuck-value Universal.identity))))
+-- trace "start"
+--   >-> trace priv-key
+--   >-> trace "end"
+--   >-> (let
+--         idd := InternalIdentity.fromByteArray priv-key;
+--         key := trace idd >-> InternalIdentity.toByteArray idd;
+--         m := AnomaAtom.fromNat (builtinAnomaEncode 123);
+--         kk := AnomaAtom.fromNat (builtinAnomaEncode key);
+--         yyy := trace "message" >-> trace m >-> 1;
+--         signature := SystemBuiltins.anomaSignDetached m key;
+--       in trace "yeet" >-> "hello");
