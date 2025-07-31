@@ -1,0 +1,84 @@
+module Spacebucks.Signing;
+
+import Stdlib.Prelude open;
+import Applib open;
+import Anoma.Encode open;
+import Stdlib.Debug.Trace open;
+import Anoma.Identity.External open;
+import Anoma.Identity.Internal open;
+import BaseLayer.ResourceMachine open;
+import Anoma.Builtin.System as SystemBuiltins open;
+import Spacebucks.Helpers open;
+
+-- create an appdata entry for the given nullifier
+create-app-data-entry-nullifier
+  (identity : Identity)
+  (nullifier : Nullifier)
+  : Pair RawTag (List AnomaAtom) :=
+  let
+    signature-value : AnomaAtom := create-signature-value identity;
+    signature-key : RawTag := Nullifier.toRawTag nullifier;
+  in signature-key, [signature-value];
+
+-- create an appdata entry for the given commitment
+create-app-data-entry-commitment
+  (identity : Identity)
+  (commitment : Commitment)
+  : Pair RawTag (List AnomaAtom) :=
+  let
+    signature-value : AnomaAtom := create-signature-value identity;
+    signature-key : RawTag := Commitment.toRawTag commitment;
+    atom : Pair RawTag (List AnomaAtom) := signature-key, [signature-value];
+  in trace "signature value"
+    >-> trace signature-value
+    >-> trace "signature key"
+    >-> trace signature-key
+    >-> atom;
+
+-- create the app data for the given nullifiers and commitments
+create-app-data
+  (identity : Identity)
+  (nullifiers : List Nullifier)
+  (commitments : List Commitment)
+  : Map RawTag (List AnomaAtom) :=
+  let
+    nullifiers : List (Pair RawTag (List AnomaAtom)) :=
+      map (create-app-data-entry-nullifier identity) nullifiers;
+    commitments : List (Pair RawTag (List AnomaAtom)) :=
+      map (create-app-data-entry-commitment identity) commitments;
+  in Map.fromList (nullifiers ++ commitments);
+
+-- create a list of nullifiers for the given list of resources.
+nullifiers-for-consumed (resources : List Resource) : List Nullifier :=
+  map Resource.Transparent.nullifier resources;
+
+-- create a list of commitments for a list of resources.
+commitments-for-created (resources : List Resource) : List Commitment :=
+  map (rawCommitment >> Commitment.fromNat) resources;
+
+-- create a signature for a message and the given identity.
+create-signature (message : Nat) (identity : Identity) : Signature :=
+  let
+    private-key : InternalIdentity := Identity.internal identity;
+    key-bytes : ByteArray := InternalIdentity.toByteArray private-key;
+    signature : ByteArray := SystemBuiltins.anomaSignDetached 0 key-bytes;
+  in Signature.mk@{
+       unSignature := signature;
+     };
+
+-- create a signature wrapped in an AppData.Value record.
+-- This is necessary to store it in the app data.
+create-signature-value (identity : Identity) : AnomaAtom :=
+  let
+    signature : Signature := create-signature 0 identity;
+    signature-atom : AnomaAtom :=
+      AnomaAtom.fromNat (builtinAnomaEncode signature);
+    signature-value : AppData.Value :=
+      AppData.Value.mk@{
+        atom := signature-atom;
+        deletionCriteria := true;
+      };
+  in
+  trace "signature"
+  >-> trace signature-value
+  >-> (builtinAnomaEncode >> AnomaAtom.fromNat) signature-value;

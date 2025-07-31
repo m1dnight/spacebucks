@@ -7,6 +7,8 @@ import Stdlib.Debug.Trace open;
 import Anoma.Identity.External open;
 import Anoma.Identity.Internal open;
 import Spacebucks.Spacebuck open;
+import Spacebucks.Helpers open;
+import Spacebucks.Signing open;
 
 -- ----------------------------------------------------------------------------
 --  Helpers
@@ -27,19 +29,51 @@ transfer-spacebucks-transaction
   (logic : Logic)
   (creator : Identity)
   (receiver : ExternalIdentity)
-  (resource : Resource)
+  (consumed-resource : Resource)
   : M Transaction :=
   do {
     ctx <- getTxContext;
-    nonce1 <- genRandomNonce;
+    nonce-created <- genRandomNonce;
     nonce2 <- genRandomNonce;
     let
-      new-resource : Resource := change-owner resource receiver;
+      -- the current root passed in via the transaction context
+      current-root : CommitmentRoot := TxContext.currentRoot ctx;
+
+      -- create the created resource and its commitment
+      created-resource : Resource := change-owner consumed-resource receiver;
+
+      -- create commitments and nullifiers
+      commitments : List Commitment :=
+        commitments-for-created [created-resource];
+      nullifiers : List Nullifier :=
+        nullifiers-for-consumed [consumed-resource];
+
+      rooted-nullifier :=
+        RootedNullifiableResource.Transparent.mk current-root consumed-resource;
+
+      appdata-map : Map RawTag (List AnomaAtom) :=
+        create-app-data creator nullifiers commitments;
+      appdata : AppData :=
+        AppData.fromMap (create-app-data creator nullifiers commitments);
+
+      action : Action :=
+              Action.create@{
+                consumed := [rooted-nullifier];
+                created := [created-resource];
+                appData := appdata;
+              };
+      -- commitment roots
+      commitment-roots := [current-root];
+
+      -- roots
+      roots := AnomaSet.fromList commitment-roots;
+      actions := AnomaSet.fromList [action];
     in
-    mkTransactionNoPublicData@{
-      consumed := [resource];
-      created := [new-resource];
-    };
+    pure
+      Transaction.mk@{
+        roots := AnomaSet.fromList commitment-roots;
+        actions := AnomaSet.fromList [action];
+      };
   };
 
 -- ----------------------------------------------------------------------------
@@ -53,21 +87,17 @@ main
   (resource : Resource)
   (latest-root : CommitmentRoot)
   : TransactionRequest :=
-  trace latest-root >-> let
-    -- parse the public and private key from the arguments and create the caller
-    sender-public : ExternalIdentity :=
-      ExternalIdentity.fromByteArray sender-public;
-    sender-private : InternalIdentity :=
-      InternalIdentity.fromByteArray sender-private;
+let
+    public-key := fix-raw-public-key sender-public;
+    private-key := fix-raw-private-key sender-private;
+    receiver := fix-raw-public-key receiver-public;
+
+    -- create the identity record that holds the keypair.
     sender : Identity :=
       Identity.mk@{
-        internal := sender-private;
-        external := sender-public;
+        internal := private-key;
+        external := public-key;
       };
-
-    -- receiver's public key
-    receiver : ExternalIdentity :=
-      ExternalIdentity.fromByteArray receiver-public;
 
     -- create the transaction context which holds the caller and the current root
     context : TxContext :=

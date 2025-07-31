@@ -8,230 +8,17 @@ import Anoma.Identity.External open;
 import Anoma.Identity.Internal open;
 import BaseLayer.ResourceMachine open;
 import Anoma.Builtin.System as SystemBuiltins open;
-
--- ----------------------------------------------------------------------------
---  Helpers
-
--- decode an atom into another type.
-decode-atom {T} (atom : AnomaAtom) : T :=
-  builtinAnomaDecode (AnomaAtom.toNat atom);
-
-encode-atom {T} (value : T) : AnomaAtom :=
-  AnomaAtom.fromNat (builtinAnomaEncode value);
+import Spacebucks.Helpers open;
 
 -- Returns the owner of a spacebuck resource.
 -- The owner is defined by their public key.
 spacebuck-owner (resource : Resource) : ExternalIdentity :=
   let
-    value := Resource.value resource;
-    spacebuck-value : SpacebuckValue := decode-atom value;
-    owner : ExternalIdentity := SpacebuckValue.owner spacebuck-value;
+    atom : AnomaAtom := Resource.value resource;
+    nat : Nat := AnomaAtom.toNat atom;
+    value : SpacebuckValue := builtinAnomaDecode nat;
+    owner : ExternalIdentity := SpacebuckValue.owner value;
   in owner;
-
--- ----------------------------------------------------------------------------
---  Logic function
-
--- validate an ephemeral consumed resource
-validate-ephemeral-consumed-resource (args : Logic.Args) : Bool :=
-  let
-    x := trace "validate-ephemeral-consumed-resource" >-> 1;
-    owner : ExternalIdentity := spacebuck-owner (Logic.Args.self args);
-  in true;
-
--- validate an ephemeral created resource
-validate-ephemeral-created-resource (args : Logic.Args) : Bool :=
-  let
-    x := trace "validate-ephemeral-created-resource" >-> 1;
-    owner : ExternalIdentity := spacebuck-owner (Logic.Args.self args);
-  in true;
-
--- validate a consumed resource
-validate-non-ephemeral-consumed-resource (args : Logic.Args) : Bool :=
-  let
-    x := trace "validate-non-ephemeral-consumed-resource" >-> 1;
-    owner : ExternalIdentity := spacebuck-owner (Logic.Args.self args);
-  in true;
-
--- validate a created resource
-validate-non-ephemeral-created-resource (args : Logic.Args) : Bool :=
-  let
-    x := trace "validate-non-ephemeral-created-resource" >-> 1;
-    owner : ExternalIdentity := spacebuck-owner (Logic.Args.self args);
-  in true;
-
-logicFunction (args : Logic.Args) : Bool :=
-  -- >-> trace "isConsumed"
-  -- >-> trace (Logic.Args.isConsumed args)
-  -- >-> trace (Resource.nonce (Logic.Args.self args))
-  -- >-> trace (listMap Resource.nonce (Logic.Args.consumed args))
-  -- >-> trace (listMap Resource.nonce (Logic.Args.created args))
-  -- >-> trace (length (Logic.Args.created args))
-  -- >-> trace (Logic.Args.appData args)
-  -- >-> trace (Resource.ephemeral (Logic.Args.self args))
-  -- >-> trace "ending"
-
-  -- let
-  --   value := "here";
-  --   appdata := Logic.Args.appData args;
-  --   selfTag := RawTag.fromTag (Logic.Args.selfTag args);
-  -- in trace value >-> trace selfTag >-> true;
-  true;
--- in if
---   | is-ephemeral && is-created := validate-ephemeral-created-resource args
---   | is-ephemeral := validate-ephemeral-consumed-resource args
---   | is-created := validate-non-ephemeral-created-resource args
---   | else := validate-non-ephemeral-consumed-resource args;
-
--- ----------------------------------------------------------------------------
---  Create a transaction to mint some spacebucks.
-
--- create a list of nullifiers for the given list of resources.
-nullifiers-for-consumed (resources : List Resource) : List Nullifier :=
-  map Resource.Transparent.nullifier resources;
-
--- create a list of commitments for a list of resources.
-commitments-for-created (resources : List Resource) : List Commitment :=
-  map (rawCommitment >> Commitment.fromNat) resources;
-
--- create a signature for a message and the given identity.
-create-signature (message : Nat) (identity : Identity) : Signature :=
-  trace "create-signature"
-    >-> (let
-          private-key : InternalIdentity := Identity.internal identity;
-          key-bytes : ByteArray := InternalIdentity.toByteArray private-key;
-          yyy := trace key-bytes >-> 1;
-          signature : ByteArray :=
-            trace "signing" >-> SystemBuiltins.anomaSignDetached 0 key-bytes;
-        in trace "signed"
-          >-> Signature.mk@{
-                unSignature := signature;
-              });
-
--- create a signature wrapped in an AppData.Value record.
--- This is necessary to store it in the app data.
-create-signature-value (identity : Identity) : AnomaAtom :=
-  let
-    signature : Signature := create-signature 0 identity;
-    signature-atom : AnomaAtom :=
-      trace "sig created" >-> AnomaAtom.fromNat (builtinAnomaEncode signature);
-    signature-value : AppData.Value :=
-      AppData.Value.mk@{
-        atom := signature-atom;
-        deletionCriteria := true;
-      };
-  in (builtinAnomaEncode >> AnomaAtom.fromNat) signature-value;
-
--- create an appdata entry for the given nullifier
-create-app-data-entry-nullifier
-  (identity : Identity)
-  (nullifier : Nullifier)
-  : Pair RawTag (List AnomaAtom) :=
-  let
-    signature-value : AnomaAtom :=
-      trace "sig val1" >-> create-signature-value identity;
-    signature-key : RawTag := trace "sig val1" >-> Nullifier.toRawTag nullifier;
-  in trace "nullifier" >-> (signature-key, [signature-value]);
-
--- create an appdata entry for the given commitment
-create-app-data-entry-commitment
-  (identity : Identity)
-  (commitment : Commitment)
-  : Pair RawTag (List AnomaAtom) :=
-  let
-    signature-value : AnomaAtom :=
-      trace "sig val" >-> create-signature-value identity;
-    signature-key : RawTag :=
-      trace "sig val" >-> Commitment.toRawTag commitment;
-  in signature-key, [signature-value];
-
--- create the app data for the given nullifiers and commitments
-create-app-data
-  (identity : Identity)
-  (nullifiers : List Nullifier)
-  (commitments : List Commitment)
-  : Map RawTag (List AnomaAtom) :=
-  let
-    nullifiers : List (Pair RawTag (List AnomaAtom)) :=
-      map (create-app-data-entry-nullifier identity) nullifiers;
-    commitments : List (Pair RawTag (List AnomaAtom)) :=
-      map (create-app-data-entry-commitment identity) commitments;
-  in Map.fromList (nullifiers ++ commitments);
-
-create-spacebucks-transaction
-  {M : Type -> Type}
-  {{Monad M}}
-  {{Tx M}}
-  (logic : Logic)
-  (identity : Identity)
-  : M Transaction :=
-  do {
-    ctx <- getTxContext;
-    nonce1 <- genRandomNonce;
-    nonce2 <- genRandomNonce;
-    let
-      label := trace 0 >-> Label.mk 0;
-      quantity := 10;
-
-      -- the current root passed in via the transaction context
-      current-root : CommitmentRoot := TxContext.currentRoot ctx;
-      -- create the created resource and its commitment
-      nonce-created := Nonce.toRaw nonce1;
-      created-resource :=
-        make-spacebuck logic identity label quantity nonce-created;
-
-      -- create the consumed ephemeral resource and its nullifier
-      nonce-consumed := Nonce.toRaw nonce2;
-      consumed-resource : Resource :=
-        created-resource@Resource{
-          ephemeral := true;
-          nonce := nonce-consumed;
-        };
-
-      -- create commitments and nullifiers
-      commitments : List Commitment :=
-        commitments-for-created [created-resource];
-      nullifiers : List Nullifier :=
-        nullifiers-for-consumed [consumed-resource];
-      -- create the action for this transaction
-      -- action : Action :=
-      --   Action.mk@{
-      --     commitments := commitments;
-      --     nullifiers := nullifiers;
-      --     resourceLogicProofs := AnomaMap.fromList [];
-      --     complianceUnits := AnomaSet.fromList [];
-      --     appData := AppData.fromMap (create-app-data identity [] []);
-      --   };
-      rooted-nullifier :=
-        RootedNullifiableResource.Transparent.mk current-root consumed-resource;
-      appdata-map : Map RawTag (List AnomaAtom) := create-app-data identity nullifiers commitments;
-      appdata : AppData  := AppData.fromMap (create-app-data identity nullifiers commitments);
-
-      action : Action := trace "creating action" >->
-        -- Action.create@{
-        --   consumed := [rooted-nullifier];
-        --   created := [created-resource];
-        --   appData := appdata;
-        -- };
-        Action.create@{
-          consumed := [];
-          created := [];
-          appData := AppData.empty;
-        };
-      -- commitment roots
-      commitment-roots := trace "created action" >-> [current-root];
-
-      -- roots
-      roots := trace "roots" >-> AnomaSet.fromList commitment-roots;
-      actions := trace "actions" >-> AnomaSet.fromList [action];
-
-    in
-    trace 123
-      >-> pure
-        Transaction.mk@{
-          roots := AnomaSet.fromList commitment-roots;
-          actions := AnomaSet.fromList [action];
-        };
-  };
 
 -- ----------------------------------------------------------------------------
 --  Value for a Spacebuck
@@ -250,6 +37,13 @@ make-spacebuck-value (creator : ExternalIdentity) : SpacebuckValue :=
   };
 
 -- ----------------------------------------------------------------------------
+--  Spacebuck Label
+--
+-- The label of a spacebuck is just the string "Spacebuck".
+
+make-spacebuck-label : Label := Label.mk (builtinAnomaEncode "spacebucks");
+
+-- ----------------------------------------------------------------------------
 --  Spacebuck definition
 
 -- resourceLogic: The logic of a resource defines constraints on how it can be
@@ -265,13 +59,12 @@ make-spacebuck-value (creator : ExternalIdentity) : SpacebuckValue :=
 -- quantity: quantity of the resource, e.g., how many spacebucks.
 --
 -- nonce: the nonce of the resource. TODO
-
 make-spacebuck
   (resource-logic : Logic)
   (creator : Identity)
   (label : Label)
   (quantity : Nat)
-  (nonce : Nonce.Raw)
+  (nonce : Nonce)
   : Resource :=
   let
     creator-public : ExternalIdentity := Identity.external creator;
@@ -284,85 +77,6 @@ make-spacebuck
        quantity := quantity;
        ephemeral := false;
        nonce := nonce;
-       nullifierKeyCommitment := 0;
+       nullifierKeyCommitment := NullifierKeyCommitment.zero;
        unusedRandSeed := 0;
      };
-
--- ----------------------------------------------------------------------------
---  Spacebuck Label
---
--- The label of a spacebuck is just the string "Spacebuck".
-
-make-spacebuck-label : Label := Label.mk (builtinAnomaEncode "spacebucks");
-
--- ----------------------------------------------------------------------------
---  Main function
-
-fix-raw-private-key (priv-key : ByteArray) : InternalIdentity :=
-  let
-    key-pair := 32, priv-key;
-    key-atom : AnomaAtom := AnomaAtom.fromNat (builtinAnomaEncode key-pair);
-    key-bytes : ByteArray := builtinAnomaDecode (AnomaAtom.toNat key-atom);
-    identity := InternalIdentity.fromByteArray key-bytes;
-  in identity;
-
-fix-raw-public-key (priv-key : ByteArray) : ExternalIdentity :=
-  let
-    key-pair := 32, priv-key;
-    key-atom : AnomaAtom := AnomaAtom.fromNat (builtinAnomaEncode key-pair);
-    key-bytes : ByteArray := builtinAnomaDecode (AnomaAtom.toNat key-atom);
-    identity := ExternalIdentity.fromByteArray key-bytes;
-  in identity;
-
--- The label of a spacebuck is what uniquely identifies it. If Bob makes a
--- spacebuck, it's uniquely identified by the pair
--- (bob_public_key, "spacebuck").
-main
-  (logic : Logic)
-  (publicKey : ByteArray)
-  (privateKey : ByteArray)
-  (latest-root : CommitmentRoot)
-  : TransactionRequest :=
-  trace "yeet"
-    >-> let
-          -- wrap the public and private key in a tuple to add in their length
-          -- i have no idea why this is here, but whatever.
-          -- parse the public and private key from the arguments and create the caller
-          public-key := fix-raw-public-key publicKey;
-          private-key := fix-raw-private-key privateKey;
-          -- create the identity record that holds the keypair.
-          creator : Identity :=
-            Identity.mk@{
-              internal := private-key;
-              external := public-key;
-            };
-          -- create the transaction context which holds the caller and the current root
-          context : TxContext :=
-            TxContext.mk@{
-              caller := creator;
-              currentRoot := latest-root;
-            };
-        in TransactionRequest.build
-          0
-          context
-          (create-spacebucks-transaction logic creator);
-
--- Questions
--- =========
---  What is a nonce for a resource? What purpose does it serve?
-
--- Create a transaction to transfer resource R from A to B
--- =======================================================
-
--- A submits a transaction with parameters [R, A_public_key, A_private_key, B_public_key]
-
--- In the transaction function:
-
---   - create a resource R' that has B as the owner
---   - put actions in the transaction that contain the signature of some message M, signed with A_public_key, and A_private_key
-
--- The resource logic then verifies this transaction by:
---   - the resource logic can verify by using:
---     - the public key in the resource
---     - the message that was originally signed
---     - the signature put into the actions in the transaction function

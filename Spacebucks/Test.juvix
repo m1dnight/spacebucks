@@ -6,30 +6,16 @@ import Anoma.Encode open;
 import Stdlib.Debug.Trace open;
 import Anoma.Identity.External open;
 import Anoma.Identity.Internal open;
+import BaseLayer.ResourceMachine open;
 import Anoma.Builtin.System as SystemBuiltins open;
-import Anoma.Primitives.FixedSize open;
+import Spacebucks.Spacebuck open;
 
-main : Action :=
-  trace "start" >-> let
-    appdata := trace "here here" >-> AppData.empty;
-  in
-     trace "here" >-> Action.create [] [] appdata;
+main : String :=
+  let
+    number : Nat :=
+      159798390744487731888163574353608617290629346429539377805486933161568433394400098271553;
+    value : SpacebuckValue := builtinAnomaDecode number;
+  in trace value >-> trace number >-> "yolo";
 
--- let
---           priv := InternalIdentity.fromByteArray priv-key;
---           publ := ExternalIdentity.fromByteArray pub-key;
---           signed : SystemBuiltins.Internal.SignedMessage := ByteArray.zero 1;
---           ver : Bool := SystemBuiltins.anomaVerifyDetached signed "yeet" pub-key;
---         in trace "yeet" >-> "hello";
-
--- trace "start"
---   >-> trace priv-key
---   >-> trace "end"
---   >-> (let
---         idd := InternalIdentity.fromByteArray priv-key;
---         key := trace idd >-> InternalIdentity.toByteArray idd;
---         m := AnomaAtom.fromNat (builtinAnomaEncode 123);
---         kk := AnomaAtom.fromNat (builtinAnomaEncode key);
---         yyy := trace "message" >-> trace m >-> 1;
---         signature := SystemBuiltins.anomaSignDetached m key;
---       in trace "yeet" >-> "hello");
+-- hint: [" " | <<38, 10, 200, 104, 228, 209, 172, 183, 104, 161, 128, 0, 231, 202, 245, 168, 246, 35, 29, 53, 228, 2, 91, 57, 65, 155, 95, 77, 13, 212, 65, 82>>]
+-- hint: <<65, 65, 0, 255, 38, 10, 200, 104, 228, 209, 172, 183, 104, 161, 128, 0, 231, 202, 245, 168, 246, 35, 29, 53, 228, 2, 91, 57, 65, 155, 95, 77, 13, 212, 65, 82>>

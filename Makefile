@@ -21,8 +21,11 @@ clean:
 	juvix clean
 
 # run the example
-run: .compiled/Spacebuck.nockma .compiled/GetMessage.nockma .compiled/Logic.nockma .compiled/Test.nockma .compiled/Transfer.nockma
+run: .compiled/Mint.nockma .compiled/Transfer.nockma .compiled/Logic.nockma
 	elixir run.exs
+
+test: .compiled/Test.nockma
+	elixir test.exs
 
 # Add .PHONY to specify targets that don't represent files
 .PHONY: clean run

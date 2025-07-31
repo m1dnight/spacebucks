@@ -1,0 +1,40 @@
+
+module Spacebucks.Helpers;
+
+import Stdlib.Prelude open;
+import Applib open;
+import Anoma.Encode open;
+import Stdlib.Debug.Trace open;
+import Anoma.Identity.External open;
+import Anoma.Identity.Internal open;
+import BaseLayer.ResourceMachine open;
+import Anoma.Builtin.System as SystemBuiltins open;
+
+-- ----------------------------------------------------------------------------
+--  Helpers
+
+-- decode an atom into another type.
+decode-atom {T} (atom : AnomaAtom) : T :=
+  builtinAnomaDecode (AnomaAtom.toNat atom);
+
+encode-atom {T} (value : T) : AnomaAtom :=
+  AnomaAtom.fromNat (builtinAnomaEncode value);
+
+-- When a key is submitted with the transaction, it does not contain its size.
+-- Usually, we'd wrap this key in a cell [" " | key], where " " is actually 32.
+-- To avoid having to do this, this function wraps that key as such.
+fix-raw-private-key (priv-key : ByteArray) : InternalIdentity :=
+  let
+    key-pair := 32, priv-key;
+    key-atom : AnomaAtom := AnomaAtom.fromNat (builtinAnomaEncode key-pair);
+    key-bytes : ByteArray := builtinAnomaDecode (AnomaAtom.toNat key-atom);
+    identity := InternalIdentity.fromByteArray key-bytes;
+  in identity;
+
+fix-raw-public-key (priv-key : ByteArray) : ExternalIdentity :=
+  let
+    key-pair := 32, priv-key;
+    key-atom : AnomaAtom := AnomaAtom.fromNat (builtinAnomaEncode key-pair);
+    key-bytes : ByteArray := builtinAnomaDecode (AnomaAtom.toNat key-atom);
+    identity := ExternalIdentity.fromByteArray key-bytes;
+  in identity;

@@ -2,7 +2,7 @@ module Spacebucks.Logic;
 
 import Stdlib.Prelude open;
 import Applib open;
-import Spacebucks.Spacebuck open;
+import Spacebucks.Mint open;
 import Stdlib.Debug as Debug;
 
 type LogicWrapper :=
